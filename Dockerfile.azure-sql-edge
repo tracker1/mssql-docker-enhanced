@@ -1,0 +1,25 @@
+# Ubuntu 18.04.5 as of 2021-10-26
+FROM mcr.microsoft.com/azure-sql-edge:latest
+
+USER root
+ENV DEBIAN_FRONTEND=noninteractive
+
+# iptables to restrict access until database is ready
+RUN apt-get update \
+    && apt-get install -yqq iptables \
+    && apt-get clean autoclean \
+    && apt-get autoremove --yes \
+    && rm -rf /var/lib/{apt,dpkg,cache,log}/
+
+# Add latest mssql-tools
+ADD https://packages.microsoft.com/ubuntu/18.04/prod/pool/main/m/mssql-tools/mssql-tools_17.8.1.1-1_amd64.deb /root/
+RUN dpkg --extract /root/mssql-tools_17.8.1.1-1_amd64.deb / \
+    && rm /root/mssql-tools_17.8.1.1-1_amd64.deb
+
+COPY ./scripts/ /scripts/
+RUN chmod +x /scripts/*
+
+HEALTHCHECK --interval=1m --timeout=5s --start-period=30s --retries=5 \
+    CMD /bin/bash -c "test -f /var/opt/mssql/sql-server-up.marker"
+
+CMD ["/scripts/start.bash"]
